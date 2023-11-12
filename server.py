@@ -2,17 +2,48 @@ import asyncio
 import aiofiles
 import os
 import logging
+import argparse
 
 from aiohttp import web
 from subprocess import PIPE
 
 
-logging.basicConfig(level=logging.DEBUG)
-
-UPLOADED_PART_SIZE = 102400
-
-
 async def archive(request):
+    parser = argparse.ArgumentParser(description='Скрипт скачивания фотографий')
+    parser.add_argument(
+        '--logging',
+        nargs='?',
+        type=bool,
+        default=False,
+        help='включить или выключить логирование'
+    )
+    parser.add_argument(
+        '--delay',
+        nargs='?',
+        type=float,
+        default=0.1,
+        help='включить задержку ответа'
+    )
+    parser.add_argument(
+        '--folder',
+        nargs='?',
+        type=str,
+        default='photos',
+        help='путь к каталогу с фотографиями'
+    )
+    parser.add_argument(
+        '--size',
+        nargs='?',
+        type=int,
+        default=102400,
+        help='размер скачиваемого блока'
+    )
+    
+    parser_args = parser.parse_args()
+    photos_folder = parser_args.folder
+    
+    if parser_args.logging:
+        logging.basicConfig(level=logging.INFO)
     
     async def process_trminate():
         process.terminate()
@@ -21,16 +52,17 @@ async def archive(request):
     
     archive_hash = request.match_info.get('archive_hash', "Anonymous")
     
-    if not os.path.exists(f"./photo/{archive_hash}") or not os.path.isdir(f"./photo/{archive_hash}"):
+    if (not os.path.exists(f"./{photos_folder}/{archive_hash}")
+            or not os.path.isdir(f"./{photos_folder}/{archive_hash}")):
         raise web.HTTPNotFound(
             text=f"<h2 style='color: red'>Архив {archive_hash} не существует или был удален</h2>",
             content_type='text/html')
     
     process = await asyncio.create_subprocess_exec(
-        'zip',  '-r', '-', './', cwd=f"./photo/{archive_hash}", stdout=PIPE, stderr=PIPE)
-    await asyncio.sleep(.1)
+        'zip',  '-r', '-', './', cwd=f"./{photos_folder}/{archive_hash}", stdout=PIPE, stderr=PIPE)
+    await asyncio.sleep(parser_args.delay)
     chunk_number = 1
-    logging.info(f'Get archive {archive_hash}')
+    logging.info(f'Get archive {photos_folder}/{archive_hash}')
     
     response = web.StreamResponse(status=200, reason='OK', headers={
             'Content-Type': 'multipart/x-mixed-replace',
@@ -38,12 +70,12 @@ async def archive(request):
     await response.prepare(request)
     
     try:
-        chunk = await process.stdout.read(UPLOADED_PART_SIZE)
+        chunk = await process.stdout.read(parser_args.size)
         while chunk:
-            await asyncio.sleep(.1)
+            await asyncio.sleep(parser_args.delay)
             logging.info(f'Sending archive chunk {chunk_number}, {len(chunk)}')
             await response.write(chunk)
-            chunk = await process.stdout.read(UPLOADED_PART_SIZE)
+            chunk = await process.stdout.read(parser_args.size)
             chunk_number += 1
         
     except asyncio.CancelledError:
