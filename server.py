@@ -1,30 +1,27 @@
 import asyncio
 import aiofiles
-import datetime
 
 from aiohttp import web
+from multidict import MultiDict
+from subprocess import PIPE
 
 
-INTERVAL_SECS = 1
+UPLOADED_PART_SIZE = 102400
 
 
 async def archive(request):
-    raise NotImplementedError
-
-
-async def uptime_handler(request):
-    response = web.StreamResponse()
-    # Большинство браузеров не отрисовывают частично загруженный контент, только если это не HTML.
-    # Поэтому отправляем клиенту именно HTML, указываем это в Content-Type.
-    response.headers['Content-Type'] = 'text/html'
-    # Отправляет клиенту HTTP заголовки
-    await response.prepare(request)
+    archive_hash = request.match_info.get('archive_hash', "Anonymous")
+    process = await asyncio.create_subprocess_shell(
+        "zip -r - ./", cwd=f"./photo/{archive_hash}", stdout=PIPE, stderr=PIPE)
+    all_archive = b''
     while True:
-        formatted_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        message = f'{formatted_date}<br>'  # <br> — HTML тег переноса строки
-        # Отправляет клиенту очередную порцию ответа
-        await response.write(message.encode('utf-8'))
-        await asyncio.sleep(INTERVAL_SECS)
+        stdout = await process.stdout.read(UPLOADED_PART_SIZE)
+        all_archive += stdout
+        
+        if process.stdout.at_eof():
+            headers = MultiDict({'Content-Disposition': 'Attachment; filename="photos.zip"'})
+            return web.Response(headers=headers, body=all_archive)
+        await asyncio.sleep(.1)
         
 
 async def handle_index_page(request):
@@ -37,7 +34,6 @@ if __name__ == '__main__':
     app = web.Application()
     app.add_routes([
         web.get('/', handle_index_page),
-        web.get('/archive/7kna', uptime_handler),
         web.get('/archive/{archive_hash}/', archive),
     ])
     web.run_app(app)
