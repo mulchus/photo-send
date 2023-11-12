@@ -13,6 +13,12 @@ UPLOADED_PART_SIZE = 102400
 
 
 async def archive(request):
+    
+    async def process_trminate():
+        process.terminate()
+        await process.communicate()
+        return
+    
     archive_hash = request.match_info.get('archive_hash', "Anonymous")
     
     if not os.path.exists(f"./photo/{archive_hash}") or not os.path.isdir(f"./photo/{archive_hash}"):
@@ -20,8 +26,9 @@ async def archive(request):
             text=f"<h2 style='color: red'>Архив {archive_hash} не существует или был удален</h2>",
             content_type='text/html')
     
-    process = await asyncio.create_subprocess_shell(
-        "zip -r - ./", cwd=f"./photo/{archive_hash}", stdout=PIPE, stderr=PIPE)
+    process = await asyncio.create_subprocess_exec(
+        'zip',  '-r', '-', './', cwd=f"./photo/{archive_hash}", stdout=PIPE, stderr=PIPE)
+    await asyncio.sleep(.1)
     chunk_number = 1
     logging.info(f'Get archive {archive_hash}')
     
@@ -33,16 +40,24 @@ async def archive(request):
     try:
         chunk = await process.stdout.read(UPLOADED_PART_SIZE)
         while chunk:
+            await asyncio.sleep(.1)
             logging.info(f'Sending archive chunk {chunk_number}, {len(chunk)}')
             await response.write(chunk)
             chunk = await process.stdout.read(UPLOADED_PART_SIZE)
             chunk_number += 1
-            await asyncio.sleep(5)
         
     except asyncio.CancelledError:
-        logging.error("Download was interrupted ")
-        
-        raise
+        logging.error(f'Download was interrupted.')
+        await process_trminate()
+    
+    except IndexError:
+        logging.error(f'Download IndexError')
+        await process_trminate()
+    
+    except SystemExit:
+        logging.error(f'Download SystemExit error')
+        await process_trminate()
+    
     return response
 
 
