@@ -1,11 +1,14 @@
 import asyncio
 import aiofiles
 import os
+import logging
 
 from aiohttp import web
 from multidict import MultiDict
 from subprocess import PIPE
 
+
+logging.basicConfig(level=logging.DEBUG)
 
 UPLOADED_PART_SIZE = 102400
 
@@ -21,14 +24,17 @@ async def archive(request):
     process = await asyncio.create_subprocess_shell(
         "zip -r - ./", cwd=f"./photo/{archive_hash}", stdout=PIPE, stderr=PIPE)
     all_archive = b''
+    chunk_number = 1
+    logging.info(f'Get archive {archive_hash}')
     while True:
         stdout = await process.stdout.read(UPLOADED_PART_SIZE)
         all_archive += stdout
-        
+        logging.info(f'Sending archive chunk {chunk_number}')
+        chunk_number += 1
         if process.stdout.at_eof():
             headers = MultiDict({'Content-Disposition': 'Attachment; filename="photos.zip"'})
             return web.Response(headers=headers, body=all_archive)
-        await asyncio.sleep(.1)
+        await asyncio.sleep(1)
         
 
 async def handle_index_page(request):
