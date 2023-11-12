@@ -1,5 +1,6 @@
 import asyncio
 import aiofiles
+import os
 
 from aiohttp import web
 from multidict import MultiDict
@@ -11,6 +12,12 @@ UPLOADED_PART_SIZE = 102400
 
 async def archive(request):
     archive_hash = request.match_info.get('archive_hash', "Anonymous")
+    
+    if not os.path.exists(f"./photo/{archive_hash}"):
+        raise web.HTTPNotFound(
+            text=f"<h2 style='color: red'>Архив {archive_hash} не существует или был удален</h2>",
+            content_type='text/html')
+    
     process = await asyncio.create_subprocess_shell(
         "zip -r - ./", cwd=f"./photo/{archive_hash}", stdout=PIPE, stderr=PIPE)
     all_archive = b''
