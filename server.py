@@ -54,7 +54,7 @@ async def archive(request):
     if parser_args.logging:
         logging.basicConfig(level=logging.INFO)
     
-    archive_hash = request.match_info.get('archive_hash', "Anonymous")
+    archive_hash = request.match_info['archive_hash']
     
     if (not os.path.exists(f"./{photos_folder}/{archive_hash}")
             or not os.path.isdir(f"./{photos_folder}/{archive_hash}")):
@@ -101,7 +101,7 @@ async def handle_index_page(request):
     async with aiofiles.open('index.html', mode='r') as index_file:
         index_contents = await index_file.read()
     return web.Response(text=index_contents, content_type='text/html')
-
+    
 
 if __name__ == '__main__':
     app = web.Application()
