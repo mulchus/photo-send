@@ -8,7 +8,7 @@ from aiohttp import web
 from subprocess import PIPE
 
 
-async def archive(request):
+def get_args():
     parser = argparse.ArgumentParser(description='Скрипт скачивания фотографий')
     parser.add_argument(
         '--logging',
@@ -38,17 +38,21 @@ async def archive(request):
         default=102400,
         help='размер скачиваемого блока'
     )
+    return parser.parse_args()
+
+
+async def process_trminate(process):
+    process.terminate()
+    await process.communicate()
+    return
     
-    parser_args = parser.parse_args()
+
+async def archive(request):
+    parser_args = get_args()
     photos_folder = parser_args.folder
     
     if parser_args.logging:
         logging.basicConfig(level=logging.INFO)
-    
-    async def process_trminate():
-        process.terminate()
-        await process.communicate()
-        return
     
     archive_hash = request.match_info.get('archive_hash', "Anonymous")
     
@@ -80,15 +84,15 @@ async def archive(request):
         
     except asyncio.CancelledError:
         logging.error(f'Download was interrupted.')
-        await process_trminate()
+        await process_trminate(process)
     
     except IndexError:
         logging.error(f'Download IndexError')
-        await process_trminate()
+        await process_trminate(process)
     
     except SystemExit:
         logging.error(f'Download SystemExit error')
-        await process_trminate()
+        await process_trminate(process)
     
     return response
 
