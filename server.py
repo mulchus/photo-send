@@ -41,9 +41,10 @@ def get_args():
     return parser.parse_args()
 
 
-async def process_trminate(process):
-    process.terminate()
-    await process.communicate()
+async def process_terminate(process):
+    if process.returncode is None:
+        process.terminate()
+        await process.communicate()
     return
     
 
@@ -84,16 +85,16 @@ async def archive(request):
         
     except asyncio.CancelledError:
         logging.error(f'Download was interrupted.')
-        await process_trminate(process)
+        await process_terminate(process)
         raise
     
     except IndexError:
         logging.error(f'Download IndexError')
-        await process_trminate(process)
+        await process_terminate(process)
     
     except SystemExit:
         logging.error(f'Download SystemExit error')
-        await process_trminate(process)
+        await process_terminate(process)
     
     return response
 
