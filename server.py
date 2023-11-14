@@ -85,17 +85,17 @@ async def archive(request):
         
     except asyncio.CancelledError:
         logging.error(f'Download was interrupted.')
-        await process_terminate(process)
         raise
     
     except IndexError:
         logging.error(f'Download IndexError')
-        await process_terminate(process)
     
     except SystemExit:
         logging.error(f'Download SystemExit error')
-        await process_terminate(process)
     
+    finally:
+        await process_terminate(process)
+        
     return response
 
 
